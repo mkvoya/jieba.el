@@ -35,6 +35,7 @@ void init_jieba(const string &base_dir)
                               base_dir + USER_DICT_PATH,
                               base_dir + IDF_PATH,
                               base_dir + STOP_WORD_PATH);
+  initer.detach();
 }
 
 static string
