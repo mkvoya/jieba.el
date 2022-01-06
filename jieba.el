@@ -42,25 +42,9 @@
   :group 'chinese
   :prefix "jieba-")
 
-(defcustom jieba-server-start-args
-  `("node" "simple-jieba-server.js")
-  ""
-  :type 'list
-  :group 'jieba)
-
-(defcustom jieba-split-algorithm 'mix
-  ""
-  :type '(choice (const :tag "MP Segment Algorithm" mp)
-                 (const :tag "HMM Segment Algorithm" hmm)
-                 (const :tag "Mix Segment Algorithm" mix)))
-
 (defcustom jieba-use-cache t
   "Use cache to cache the result of segmentation if non-nil."
   :type 'boolean
-  :group 'jieba)
-
-(defcustom jieba-current-backend 'node
-  "The Jieba backend in using."
   :group 'jieba)
 
 ;;; Utils
@@ -82,34 +66,13 @@
 
 ;;; Backend Access API
 
-(cl-defgeneric jieba-do-split (backend str))
+(cl-eval-when (load eval)
+  (require 'emacs-jieba-module))
 
-(cl-defgeneric jieba-load-dict (backend dicts))
+(cl-defgeneric jieba-do-split (str))
 
-(cl-defgeneric jieba--initialize-backend (_backend)
-  nil)
-
-(cl-defgeneric jieba--shutdown-backend (_backend)
-  nil)
-
-(cl-defgeneric jieba--backend-available? (backend))
-
-(defun jieba-ensure (&optional interactive-restart?)
-  (interactive "P")
-  (if (not (jieba--backend-available? jieba-current-backend))
-      (jieba--initialize-backend jieba-current-backend)
-    (when (and
-           interactive-restart?
-           (y-or-n-p
-            "Jieba backend is running now, do you want to restart it?"))
-      (jieba--shutdown-backend jieba-current-backend)
-      (jieba--initialize-backend jieba-current-backend))))
-
-(defun jieba--assert-server ()
-  "Assert the server is running, throw an error when assertion failed."
-  (or (jieba--backend-available? jieba-current-backend)
-      (error "[JIEBA] Current backend: %s is not available!"
-             jieba-current-backend)))
+(cl-defmethod jieba-do-split (str)
+  (emacs-jieba--do-split str))
 
 ;;; Data Cache
 
@@ -117,7 +80,7 @@
 
 (defun jieba--cache-gc ())
 
-(cl-defmethod jieba-do-split :around ((_backend t) string)
+(cl-defmethod jieba-do-split :around (string)
   "Access cache if used."
   (let ((not-found (make-symbol "hash-not-found"))
         result)
@@ -135,7 +98,7 @@
 (defvar jieba--single-chinese-char-re "\\cC")
 
 (defun jieba-split-chinese-word (str)
-  (jieba-do-split jieba-current-backend str))
+  (jieba-do-split str))
 
 (defsubst jieba-chinese-word? (s)
   "Return t when S is a real chinese word (All its chars are chinese char.)"
@@ -163,7 +126,6 @@
     (cons beg end)))
 
 (defun jieba--chinese-word-atpt-bounds (beg end)
-  (jieba--assert-server)
   (let ((word (buffer-substring-no-properties beg end)))
     (when (jieba-chinese-word? word)
       (let ((cur (point))
@@ -237,11 +199,8 @@
   :global t
   :keymap jieba-mode-map
   :lighter " Jieba"
-  (when jieba-mode (jieba-ensure t)))
+  )
 
 (provide 'jieba)
-
-(cl-eval-when (load eval)
-  (require 'jieba-node))
 
 ;;; jieba.el ends here
